@@ -1,107 +1,165 @@
-const ticTacToe = (function(doc, multiplayerBoolean) {
-    let player1 = {
-        name: "Player 1",
-        icon: "X",
-    };
+const tictactoe = (function(doc) {
 
-    let player2 = {
-        name: "Player 2",
-        icon: "O",
-    };
+    const human = "X";
+    const cpu = "O";
+    let gameOver = false;
 
-    let currentPlayer = player1;
-    let multiplayer = multiplayerBoolean;
+    let board = [
+        ["", "", ""],
+        ["", "", ""],
+        ["", "", ""],
+    ];
 
-    let gameBoard = []
-    let movementsCount = 0;
-    let gameEnded;
 
-    const displayOnDOM = () => {
-        gameBoard = [
-            ["" , "" , ""],
-            ["" , "" , ""],
-            ["" , "" , ""],
-        ];
+    const allCells = doc.querySelectorAll(".cell");
 
-        movementsCount = gameBoard.reduce( (accumulator, current) => accumulator + current.length, 0);
+    allCells.forEach((cell) => {
+        cell.addEventListener("click", (e) => {
+            if( gameOver || !e.target.classList.contains("available")) return;
+            e.target.classList.remove("available");
+            const targetRow = e.target.getAttribute("data-row");
+            const targetColumn = e.target.getAttribute("data-column");
+            board[targetRow][targetColumn] = human;
+            e.target.innerText = human;
 
-        if(confirm("CPU mode?")) {
-            multiplayer = false;
-            player2.name = "CPU";
+            if(checkVictory(board, human)) {
+                gameOver = true;
+                alert("You win!!!")
+                return;
+            }
+            
+            if (checkTie(board)) {
+                alert("It was a tie...")
+                return;
+            }
+
+            else handleCpuMove();
+
+        })
+    })
+
+    
+
+    const handleCpuMove = function() {
+        const {row, column} = (miniMax(board, cpu));
+        board[row][column] = cpu;
+        doc.querySelector(`.cell[data-row="${row}"][data-column="${column}"]`).innerText = cpu;
+        if(checkVictory(board, cpu)) {
+            gameOver = true;
+            alert("You lose!!!")
+            return;
         }
-        gameEnded = false;
-        currentPlayer = player1;
+        
+        if (checkTie(board)) {
+            alert("It was a tie...")
+            return;
+        }
+    }
 
-        const DOMtemplate = doc.querySelector(".game-container");
-        DOMtemplate.innerHTML = "";
-        for(let i = 0; i < gameBoard.length; i++){
-            for(let j = 0; j < gameBoard[i].length; j++){
+    const checkVictory = function ( board, player) {
+        if (board.some((row) => row.every((cell) => cell === player))) return true;
+        if (board.every((row) => row[0] === player)) return true;
+        if (board.every((row) => row[1] === player)) return true;
+        if (board.every((row) => row[2] === player)) return true;
 
-                const tttCell = doc.createElement('div');
-                tttCell.classList.add('cell', 'available');
-                tttCell.setAttribute('data-row', i);
-                tttCell.setAttribute('data-column', j);
+        if (board[0][0] === player && 
+            board[1][1] === player && 
+            board[2][2] === player ||
+            board[0][2] === player &&
+            board[1][1] === player &&
+            board[2][0] === player) return true;
 
-                tttCell.addEventListener('click', function handleClick(e) {
-                    if(!!e.target.getAttribute('data-choice')) return;
-                    
-                    if(gameBoard[e.target.getAttribute("data-row")][e.target.getAttribute('data-column')] != "" || gameEnded) return;
-                    e.target.setAttribute('data-choice', currentPlayer.icon);
-                    e.target.classList.replace('available', 'unavailable'); 
-                    gameBoard[e.target.getAttribute("data-row")][e.target.getAttribute('data-column')] = currentPlayer.icon;
-                    
-                    movementsCount--;
+        return false;
+    }
 
-                    if(checkVictory(i, j, currentPlayer)) {
-                        alert(`${currentPlayer.name} has won`);
-                        gameEnded = true;
-                    }
+    const miniMax = function(myBoard, player) {
+        const availableMoves = findMoves(myBoard);
+      
+        if (checkVictory(myBoard, cpu)) {
+          return { score: 10 };
+        } else if (checkVictory(myBoard, human)) {
+          return { score: -10 };
+        } else if (availableMoves.length === 0) {
+          return { score: 0 };
+        }
+      
+        const moves = [];
+      
+        for (let i = 0; i < availableMoves.length; i++) {
+          let move = {};
+          move.row = availableMoves[i][0];
+          move.column = availableMoves[i][1];
+          myBoard[move.row][move.column] = player;
+      
+          if (player === cpu) {
+            const result = miniMax(myBoard, human);
+            move.score = result.score;
+          } else {
+            const result = miniMax(myBoard, cpu);
+            move.score = result.score;
+          }
+      
+          myBoard[move.row][move.column] = "";
+          moves.push(move);
+        }
+      
+        let bestMove = null;
+        let bestScore = player === cpu ? -Infinity : Infinity;
+      
+        for (let i = 0; i < moves.length; i++) {
+          if (
+            (player === cpu && moves[i].score > bestScore) ||
+            (player === human && moves[i].score < bestScore)
+          ) {
+            bestScore = moves[i].score;
+            bestMove = i;
+          }
+        }
+        
+        console.log(moves[bestMove]);
+        return moves[bestMove];
+      };
+      
 
-                    if(movementsCount == 0 && !gameEnded) {
-                        alert("Tie");
-                        displayOnDOM();
-                    }
+    const checkTie = function(currentBoard) {
+        if(currentBoard.every((currentRow) => currentRow.every((currentCell) => currentCell === human || currentCell === cpu))) return true;
+        return false;
+    }
 
-                    if(multiplayer) {
-                        currentPlayer == player1 ? currentPlayer = player2 : currentPlayer = player1;
-                    } else {
-                        cpuMovement();
-                    }
-
-                });
-
-                DOMtemplate.appendChild(tttCell); 
+    const findMoves = function(currentBoard) {
+        const moves = [];
+        for(let i = 0; i < currentBoard.length; i++) {
+            for(let j = 0; j < currentBoard[i].length; j++){
+                if(currentBoard[i][j] != human && currentBoard[i][j] != cpu){
+                    moves.push([i, j]);
+                }
             }
         }
+
+        return moves;
     }
 
-    const checkVictory = (i, j, choice) => {
-        if( gameBoard[i].every((current) => current == choice.icon) ) return true;
-        if ( gameBoard.every((current) => current[j] == choice.icon)) return true;
-
-        if( gameBoard[0][0] == choice.icon && gameBoard[1][1] == choice.icon && gameBoard[2][2] == choice.icon||
-            gameBoard[0][2] == choice.icon && gameBoard[1][1] == choice.icon && gameBoard[2][0] == choice.icon) return true;
-        
+    const cleanBoard = function() {
+        board.forEach((boardRow) => boardRow.forEach((boardColumn) => boardColumn = ""));
     }
 
-    const cpuMovement = () => {
-        if(gameEnded || movementsCount == 0) return;
-
-        let randomMovement = doc.querySelectorAll(".cell.available");
-        randomMovement = randomMovement[Math.floor( Math.random() * randomMovement.length )];
-        randomMovement.setAttribute('data-choice', player2.icon);
-        randomMovement.classList.replace('available', 'unavailable'); 
-        gameBoard[randomMovement.getAttribute("data-row")][randomMovement.getAttribute('data-column')] = player2.icon;
-        movementsCount--;
-        if(checkVictory(randomMovement.getAttribute('data-row'), randomMovement.getAttribute('data-column'), player2)) {
-            alert(`${player2.name} has won`);
-            gameEnded = true;
-        }
+    const cleanCells = function() {
+        allCells.forEach((currentCell) => {
+            currentCell.classList.add("available");
+            currentCell.innerText = "";
+        })
     }
 
+    const setupGame = function() {
+        cleanBoard();
+        cleanCells();
+        gameOver = false;
+    }
 
-    return {displayOnDOM}
+    return {
+        setupGame,
+    }
 
-})(document, true);
+})(document);
 
-ticTacToe.displayOnDOM();
+tictactoe.setupGame();
